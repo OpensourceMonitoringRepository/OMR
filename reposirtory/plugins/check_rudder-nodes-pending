@@ -1,0 +1,193 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Name:         rudder-nodes-list
+# Synopsis:     Get node details from Rudder api and export them to a spreadsheet
+# Requirements: requests and xlwt Python modules
+# Authors:      Dennis Cabooter <Dennis.Cabooter@snow.nl>
+#               Matthieu Cerda <matthieu.cerda@normation.com>
+#
+
+# Imports - builtins
+import sys
+import getopt
+import os.path
+import json
+import subprocess
+import urllib3
+# Imports - external
+import requests
+#import xlwt
+urllib3.disable_warnings()
+# Configuration - BEGIN
+api_url        = ""
+api_token      = ""
+api_verbose    = 0
+#api_url        = "https://rudder.pascallegrand.org/rudder/api"
+#api_token      = "OItYmLLLeqWzvXqfsJSzxsaShJ58WQu4"
+validate_https = False
+
+class Obj_Help(object):
+  "Objet pour afficher l'aide du script"
+#-----------------------------
+#-- Constructeur de l'objet --
+#-----------------------------    
+  def __init__(self):
+    self.LongUsage = 0
+  def SetLongUsage(self,Value):
+    self.LongUsage = Value
+  def usage(self):
+    print "################################################################################"
+    print "### usage : OMR_Rudder_Api.py                                                ###"
+    print "### Copyright (C) 2015 Opensource Monitoring Community                       ###"
+    print "### Developper : Pascal legrand (contact@opensourcemonitoring.org)           ###"
+    print "###                                                                          ###"
+    print "### ------------------------------------------------------------------------ ###"
+    print "### Arguments :                                                              ###"
+    print "### --help/-h   --> Show usage without examples                              ###"
+    print "### --longhelp/--lh   --> Show usage with examples                           ###"
+    print "### --debug/-d  --> Active debugging mode                                    ###"
+    print "### --server/-s  <Rudder api URL> (non optional)                             ###"
+    print "### --request/-r <Rudder request> (non optional)                             ###"
+    print "### --keytoken/-k <Rudder Key Token> (non optional)                          ###" 
+    print "###                                                                          ###"
+    print "### Without arguments :                                                      ###"
+    print "###    Interactive mode                                                      ###"
+    print "###                                                                          ###"
+    print "### ------------------------------------------------------------------------ ###"
+    print "### Rudder object selection (non optional, only one ID)                      ###"
+    print "###    -->  no ID need if --list option selected)                            ###"
+    print "### --rules <Rudder rule ID>                                                 ###"
+    print "### --directives <Rudder directive ID>                                       ###"
+    print "### --groups <Rudder group ID>                                               ###"
+    print "### --nodes <Rudder node ID>                                                 ###"
+    print "### --parameters <Rudder parameter ID>                                       ###"
+    print "### --changes <Rudder change ID>                                             ###"
+    print "###                                                                          ###"
+    print "### ------------------------------------------------------------------------ ###"
+    print "###  API Action (non optional) :                                             ###"
+    print "### --list     --> List Rudder type object                                   ###"
+    print "###      --> Default : All objects                                           ###"
+    print "###      --> Id need for details                                             ###"
+    print "### --create   --> Create new object type selected                           ###"
+    print "### --update   --> Update object ID selected                                 ###"
+    print "### --delete   --> Delete object ID selected                                 ###"
+    print "### --clone    --> Clone object ID selected                                  ###"
+    print "###                                                                          ###"
+    print "### ------------------------------------------------------------------------ ###"
+    print "### Node rudder object options :                                             ###"
+    print "### --decline --> Decline host ID rudder pending                             ###"
+    print "### --accept --> Accept host ID rudder pending                               ###"
+    print "### --pending --> List host ID rudder pending                                ###"
+    print "###                                                                          ###"
+    if self.LongUsage == 1:
+      print "### ------------------------------------------------------------------------ ###"
+      print "###  Examples :                                                              ###"
+      print "###                                                                          ###"
+      print "###  --> Rules                                                               ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###  --> Directives                                                          ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###  --> Groups                                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###  --> Node                                                                ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###  --> Parameters                                                          ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###  --> Change                                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+      print "###   ligne de commande exemple                                              ###"
+    print "###                                                                          ###"
+    print "################################################################################"
+
+
+# Configuration - END
+
+def init(key , url, verbose):
+  Message = " HOST(S) IN PENDING"
+  api_version = "latest"
+  node_url    = "%s/%s/nodes/pending" % (url, api_version)
+  headers     = {"X-API-Token": key}
+  workbook    = "/tmp/rudder-nodes-list.xls"
+  # Call the API to get the complete list of nodes
+  request = requests.get(node_url, headers=headers, verify=validate_https)
+  nodes   = json.loads(request.content)["data"]["nodes"]
+
+  # Output how many nodes we are working on
+  Node_Metrics = len(nodes)
+  # Prepare a dict() to store UUID -> Rudder agent version
+  rudder_versions = dict()
+
+  # For each node
+  #print Node_Metrics
+  if Node_Metrics != 0:
+    Message = "WARNING : " + str(Node_Metrics) + Message
+    Rc = 1
+    if verbose == 1:
+      Message = Message + " ("
+      for node in sorted(nodes):
+        # Store the node pending inventory
+        inventory_request = requests.get(node_url + "/" + node['id'] + "?include=full", headers=headers, verify=validate_https)
+        node_inventory    = json.loads(inventory_request.content)["data"]["nodes"][0]
+      # Write headers
+      headers = ["Node", "Node ID", "osName", "status"]
+      #for index, header in enumerate(headers):
+        # Indexing is zero based, row then column
+      #  print "header --> " + header
+      # Loop nodes
+      #print nodes[0:10]
+      ComptNode = 1
+      for node in sorted(nodes):
+        # Vars
+        node_id        = node["id"]
+        host_name      = node["hostname"]
+        oper_sys       = node["osName"] 
+        node_status    = node["status"]
+        Message = Message + host_name + " --> " + oper_sys 
+        if ComptNode < Node_Metrics:
+          Message = Message + ","
+        ComptNode = ComptNode + 1
+      Message = Message + ")"
+  else:
+    Message = "OK : NO" + Message
+    Rc = 0
+  print Message
+  exit(Rc)
+
+def main(argv):
+  api_verbose = 0
+  global _debug
+  #print argv
+  try:                                
+    opts, args = getopt.getopt(argv, "T:R:V", ["verbose", "longhelp","lh","help","debug" "rudder_server=", "Token"])
+  except getopt.GetoptError,e:
+    print "ERREUR !!!!!"
+    print '>>>> ERROR: %s' % str(e)
+    helpOutput.usage()
+    sys.exit(2)
+  for opt, arg in opts: 
+    #print "opt --> " + opt
+    #print "arg --> " + arg
+    if opt in ("-h",  "--help"):      
+      helpOutput.usage()                     
+      sys.exit(2)                  
+    elif opt in ("--lh","--longhelp"): 
+      helpOutput.SetLongUsage(1)
+      print helpOutput.GetLongUsage
+      helpOutput.usage()                     
+      sys.exit(2)                  
+    elif opt in ("--Token=", "-T"): 
+      api_token = arg
+    elif opt in ("--rudder_server=", "-R"): 
+      api_url = arg
+    elif opt in ("-V", "--verbose"):
+      api_verbose = 1
+  init(api_token,api_url, api_verbose)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
