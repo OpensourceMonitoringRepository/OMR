@@ -1,10 +1,12 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Name:         check_rudder-nodes-pending
 # Synopsis:     Get node pending from Rudder api for Centreon monitoring
 # Requirements: requests, urllib3 Python modules
-# Authors:      Pascal Legrand <Contact@pascallegrand.org>
+# Authors:      Dennis Cabooter <Dennis.Cabooter@snow.nl>
+#               Matthieu Cerda <matthieu.cerda@normation.com>
+#               Pascal Legrand <Contact@pascallegrand.org>
 #               
 
 # Imports - builtins
@@ -36,74 +38,33 @@ class Obj_Help(object):
   def SetLongUsage(self,Value):
     self.LongUsage = Value
   def usage(self):
-    print "################################################################################"
-    print "### usage : OMR_Rudder_Api.py                                                ###"
-    print "### Copyright (C) 2015 Opensource Monitoring Community                       ###"
-    print "### Developper : Pascal legrand (contact@opensourcemonitoring.org)           ###"
-    print "###                                                                          ###"
-    print "### ------------------------------------------------------------------------ ###"
-    print "### Arguments :                                                              ###"
-    print "### --help/-h   --> Show usage without examples                              ###"
-    print "### --longhelp/--lh   --> Show usage with examples                           ###"
-    print "### --debug/-d  --> Active debugging mode                                    ###"
-    print "### --server/-s  <Rudder api URL> (non optional)                             ###"
-    print "### --request/-r <Rudder request> (non optional)                             ###"
-    print "### --keytoken/-k <Rudder Key Token> (non optional)                          ###" 
-    print "###                                                                          ###"
-    print "### Without arguments :                                                      ###"
-    print "###    Interactive mode                                                      ###"
-    print "###                                                                          ###"
-    print "### ------------------------------------------------------------------------ ###"
-    print "### Rudder object selection (non optional, only one ID)                      ###"
-    print "###    -->  no ID need if --list option selected)                            ###"
-    print "### --rules <Rudder rule ID>                                                 ###"
-    print "### --directives <Rudder directive ID>                                       ###"
-    print "### --groups <Rudder group ID>                                               ###"
-    print "### --nodes <Rudder node ID>                                                 ###"
-    print "### --parameters <Rudder parameter ID>                                       ###"
-    print "### --changes <Rudder change ID>                                             ###"
-    print "###                                                                          ###"
-    print "### ------------------------------------------------------------------------ ###"
-    print "###  API Action (non optional) :                                             ###"
-    print "### --list     --> List Rudder type object                                   ###"
-    print "###      --> Default : All objects                                           ###"
-    print "###      --> Id need for details                                             ###"
-    print "### --create   --> Create new object type selected                           ###"
-    print "### --update   --> Update object ID selected                                 ###"
-    print "### --delete   --> Delete object ID selected                                 ###"
-    print "### --clone    --> Clone object ID selected                                  ###"
-    print "###                                                                          ###"
-    print "### ------------------------------------------------------------------------ ###"
-    print "### Node rudder object options :                                             ###"
-    print "### --decline --> Decline host ID rudder pending                             ###"
-    print "### --accept --> Accept host ID rudder pending                               ###"
-    print "### --pending --> List host ID rudder pending                                ###"
-    print "###                                                                          ###"
+    print "########################################################################################"
+    print "### usage : check_rudder-nodes-pending                                               ###"
+    print "### Copyright (C) 2015 Opensource Monitoring Community                               ###"
+    print "### Developpers :                                                                    ###"
+    print "###   - Dennis Cabooter <Dennis.Cabooter@snow.nl>                                    ###"
+    print "###   - Matthieu Cerda <matthieu.cerda@normation.com>                                ###"
+    print "###   - Pascal legrand (contact@opensourcemonitoring.org)                            ###"
+    print "###                                                                                  ###"
+    print "### -------------------------------------------------------------------------------- ###"
+    print "### Arguments :                                                                      ###"
+    print "### --help/-h   --> Show usage without examples                                      ###"
+    print "### --longhelp/--lh   --> Show usage with examples                                   ###"
+    print "### --rudder_server/-R  <Rudder api URL> (non optional)                              ###"
+    print "### --Token/-T <Rudder Key Token> (non optional)                                     ###" 
+    print "### --verbose -->  List nodes rudder pending                                         ###"
     if self.LongUsage == 1:
-      print "### ------------------------------------------------------------------------ ###"
-      print "###  Examples :                                                              ###"
-      print "###                                                                          ###"
-      print "###  --> Rules                                                               ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###  --> Directives                                                          ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###  --> Groups                                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###  --> Node                                                                ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###  --> Parameters                                                          ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###  --> Change                                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-      print "###   ligne de commande exemple                                              ###"
-    print "###                                                                          ###"
-    print "################################################################################"
-
+      print "### -------------------------------------------------------------------------------- ###"
+      print "###  Examples :                                                                      ###"
+      print "### Short Status :                                                                   ###"
+      print "### ./check_rudder-nodes-pending -R <Rudder api> -T <Token>                          ###"
+      print "### Return --> WARNING : 2 HOST(S) IN PENDING                                        ###"
+      print "###                                                                                  ###"
+      print "### With list of node rudder pending :                                               ###"
+      print "### ./check_rudder-nodes-pending -R <Rudder api> -T <Token>  --verbose               ###"
+      print "### Return --> WARNING : 2 HOST(S) IN PENDING (node_1 --> Centos, node_2 --> Debian) ###"
+    print "###                                                                                  ###"
+    print "########################################################################################"
 
 # Configuration - END
 
@@ -161,9 +122,9 @@ def init(key , url, verbose):
 def main(argv):
   api_verbose = 0
   global _debug
-  #print argv
+  helpOutput = Obj_Help()
   try:                                
-    opts, args = getopt.getopt(argv, "T:R:V", ["verbose", "longhelp","lh","help","debug" "rudder_server=", "Token"])
+    opts, args = getopt.getopt(argv, "T:R:Vh", ["verbose", "longhelp","lh","help","debug" "rudder_server=", "Token"])
   except getopt.GetoptError,e:
     print "ERREUR !!!!!"
     print '>>>> ERROR: %s' % str(e)
@@ -177,7 +138,6 @@ def main(argv):
       sys.exit(2)                  
     elif opt in ("--lh","--longhelp"): 
       helpOutput.SetLongUsage(1)
-      print helpOutput.GetLongUsage
       helpOutput.usage()                     
       sys.exit(2)                  
     elif opt in ("--Token=", "-T"): 
